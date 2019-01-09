@@ -1,0 +1,14 @@
+<?php
+namespace {namespace}\Model;
+
+use \Samas\PHP7\Base\BaseModel;
+
+class {Table}Model extends BaseModel
+{
+    protected $data_source    = '{data_source}';
+    protected $database       = '{database}';
+    protected $table_name     = '{table_name}';
+    protected $auto_increment = '{auto_increment}';
+    protected $pk             = [{pk_list}];
+    protected $table_field    = [{table_field_list}];
+}

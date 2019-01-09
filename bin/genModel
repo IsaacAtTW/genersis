@@ -1,0 +1,185 @@
+#!/usr/bin/php -q
+<?php
+use \Samas\PHP7\Kit\AppKit;
+use \Samas\PHP7\Kit\StrKit;
+use \Samas\PHP7\Model\AbstractModelClass;
+use \Samas\PHP7\Model\ModelAgent;
+use \Samas\PHP7\Model\Database\DBAdapter;
+
+require '/var/www/html/vendor/autoload.php';
+require '/var/www/html/vendor/gomaji/genersis/libs/init.php';
+
+define('MODEL_DIR', '/var/www/html/src/Model/');
+define('TEMPLATE', __DIR__ . '/template/ModelTemplate');
+
+$dataSourceList = array_keys(AppKit::config('database'));
+$dbObj = new DBAdapter;
+$dbList = [];
+foreach ($dbObj->getDatabaseList() as $database) {
+    if ($database != 'sys') {
+        $dbList[] = $database;
+    }
+}
+
+echo "=== STEP 0: Get namespace ===\n";
+$namespace = AppKit::config('project_namespace') ?
+             AppKit::config('project_namespace') :
+             '';
+if (substr($namespace, 0, 1) == '\\') {
+    $namespace = substr($namespace, 1);
+}
+if (substr($namespace, -1) != '\\') {
+    $namespace .=  '\\';
+}
+echo "namespace: " . $namespace . "Model\n";
+echo "modle dir: " . MODEL_DIR . "\n\n";
+
+echo "=== STEP 1: Define data source ===\n";
+$index = 0;
+if (count($dataSourceList) == 0) {
+    exit("No data source was defined!\n");
+} elseif (count($dataSourceList) > 1) {
+    foreach ($dataSourceList as $index => $data_source) {
+        $no = $index + 1;
+        echo "\t[$no] '$data_source'\n";
+    }
+    echo "Choose data source (default '{$dataSourceList[0]}'): ";
+    $input = trim(fgets(STDIN));
+
+    if ($input === '') {
+        $input = 1;
+    }
+
+    $index = (int)$input - 1;
+    if ($index < 0 || $index >= count($dataSourceList)) {
+        exit("Option out of range!\n");
+    }
+}
+$data_source = $dataSourceList[$index];
+echo "\$data_source = '$data_source';\n\n";
+
+echo "=== STEP 2: Define database ===\n";
+$index = 0;
+if (count($dbList) == 0) {
+    exit("No database was built!\n");
+} elseif (count($dbList) > 1) {
+    foreach ($dbList as $index => $database) {
+        $no = $index + 1;
+        echo "\t[$no] `$database`\n";
+    }
+    echo "Choose database (default `{$dbList[0]}`): ";
+    $input = trim(fgets(STDIN));
+
+    if ($input === '') {
+        $input = 1;
+    }
+
+    $index = (int)$input - 1;
+    if ($index < 0 || $index >= count($dbList)) {
+        exit("Option out of range!\n");
+    }
+}
+$database = $dbList[$index];
+echo "\$database = '$database';\n\n";
+
+echo "=== STEP 3: Define table ===\n";
+$tableList = $dbObj->getTableList($database);
+$processTableList = [];
+if (count($tableList) == 0) {
+    exit("No table was built!\n");
+}
+echo "\t[1] all tables\n";
+foreach ($tableList as $index => $table_name) {
+    $no = $index + 2;
+    echo "\t[$no] `$table_name`\n";
+}
+echo "Choose table (default process all tables): ";
+$input = trim(fgets(STDIN));
+
+if ($input === '') {
+    $input = 1;
+}
+
+$index = (int)$input - 2;
+if ($index == -1) {
+    $processTableList = $tableList;
+    echo "process all tables in `$database`\n\n";
+} elseif ($index < 0 || $index >= count($tableList)) {
+    exit("Option out of range!\n");
+} else {
+    $table_name = $tableList[$index];
+    $processTableList = [$table_name];
+    echo "\$table_name = '$table_name';\n\n";
+}
+
+echo "=== STEP 4: Write files ===\n";
+$reflectModel = new ReflectionClass(ModelAgent::class);
+$constantList = $reflectModel->getConstants();
+foreach ($processTableList as $table_name) {
+    $virtualModel = new class(
+        "$database.$table_name",
+        null,
+        ['data_source' => $data_source, 'ignore_cache' => true]
+    ) extends ModelAgent {
+        public function getConfig()
+        {
+            return [
+                'auto_increment' => $this->auto_increment,
+                'pk'             => $this->pk,
+                'table_field'    => $this->table_field
+            ];
+        }
+    };
+    $config = $virtualModel->getConfig();
+    $maxLength = max(array_map('strlen', array_keys($config['table_field'])));
+
+    $tableFieldList = [];
+    foreach ($config['table_field'] as $field => $type) {
+        $tableFieldList[] = str_repeat(' ', 8) . "'$field' " . str_repeat(' ', $maxLength - strlen($field)) .
+                            '=> self::' . array_search($type, $constantList);
+    }
+
+    $tableCamel = StrKit::convert($table_name, StrKit::CASE_U_CAMEL);
+    $fileName = $tableCamel . AbstractModelClass::MODEL_TYPE . '.php';
+    $filePath = MODEL_DIR . $fileName;
+
+    if (file_exists($filePath)) {
+        $content = file_get_contents($filePath);
+        file_put_contents($filePath, preg_replace(
+            [
+                '/\$data_source[\s]*=[a-zA-Z0-9_\'\"\s]*;/',
+                '/\$database[\s]*=[a-zA-Z0-9_\'\"\s]*;/',
+                '/\$table_name[\s]*=[a-zA-Z0-9_\'\"\s]*;/',
+                '/\$auto_increment[\s]*=[a-zA-Z0-9_\'\"\s]*;/',
+                '/\$pk[\s]*=[a-zA-Z0-9_,\'\"\s\[\]\(\)]*;/',
+                '/\$table_field[\s]*=[a-zA-Z0-9_,\'\"\s\[\]\(\)=>:]*;/'
+            ],
+            [
+                "\$data_source    = '{$data_source}';",
+                "\$database       = '{$database}';",
+                "\$table_name     = '{$table_name}';",
+                "\$auto_increment = '{$config['auto_increment']}';",
+                "\$pk             = ['" . implode("', '", $config['pk']) . "'];",
+                "\$table_field    = [\n" . implode(",\n", $tableFieldList) . "\n" . str_repeat(' ', 4) . '];'
+            ],
+            $content
+        ), 1);
+        echo "\tUpdate $fileName successfully!\n";
+    } else {
+        $template = file_get_contents(TEMPLATE);
+        $replaceMap = [
+            '{namespace}'        => $namespace,
+            '{Table}'            => $tableCamel,
+            '{data_source}'      => $data_source,
+            '{database}'         => $database,
+            '{table_name}'       => $table_name,
+            '{auto_increment}'   => $config['auto_increment'],
+            '{pk_list}'          => "'" . implode("', '", $config['pk']) . "'",
+            '{table_field_list}' => "\n" . implode(",\n", $tableFieldList) . "\n" . str_repeat(' ', 4)
+        ];
+        file_put_contents($filePath, strtr($template, $replaceMap));
+        echo "\tCreate $fileName successfully!\n";
+    }
+}
+
+echo "\nDone!\n";

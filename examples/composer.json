@@ -1,0 +1,43 @@
+{
+    "name": "gomaji/Prject",
+    "description": "I am Gomaji Project Sample",
+    "license": "proprietary",
+    "type": "Framwork",
+    "authors": [
+        {
+            "name": "Sam Lin",
+            "email": "sam.l@gomaji.com"
+        }
+    ],
+    "require":{
+       "gomaji/genersis":"*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": ">=4.8 < 6.0"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "GEN\\": "src/"
+        }
+    },
+    "repositories": [
+        {
+            "type": "git",
+            "url":  "https://github.com/IsaacAtTW/genersis.git"
+        }
+    ],
+    "scripts": {
+        "post-create-project-cmd": [
+            "cp -R vendor/gomaji/genersis/examples/public .",
+            "cp -R vendor/gomaji/genersis/examples/tests .",
+            "cp vendor/gomaji/genersis/examples/src/middleware.php ./src/middleware.php",
+            "cp vendor/gomaji/genersis/examples/STYLE.md .",
+            "cp vendor/gomaji/genersis/examples/phpunit.xml ."
+        ]
+    }
+}

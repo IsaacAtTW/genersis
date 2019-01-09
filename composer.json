@@ -1,0 +1,37 @@
+{
+    "name": "gomaji/genersis",
+    "description": "Gomaji Project Base",
+    "keywords": ["gomaji"],
+    "homepage": "https://www.gomaji.com",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Sam Lin",
+            "email": "sam.l@gomaji.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.2.0",
+        "slim/slim": "^3.1",
+        "slim/php-view": "^2.0",
+        "monolog/monolog": "^1.17",
+        "firebase/php-jwt": "^3.0|^4.0|^5.0",
+        "google/apiclient": "^2.2",
+        "guzzlehttp/guzzle": "~5.0",
+        "dakatsuka/monolog-fluent-handler": "^1.2",
+        "predis/predis": "^1.1",
+        "chrisboulton/php-resque": "1.2.x",
+        "psr/http-factory": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Samas\\PHP7\\": "libs/Samas/"
+        }
+    },
+    "config": {
+        "process-timeout" : 0
+    },
+    "scripts": {
+        "test": "phpunit"
+    }
+}
